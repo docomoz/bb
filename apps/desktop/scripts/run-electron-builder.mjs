@@ -169,6 +169,10 @@ function resolveElectronBuilderConfig(baseConfig, env, electronBuilderArgs) {
     notarize: signingPlan.notarizationEnabled,
   };
 
+  if (releaseChannel === "latest") {
+    mac.protocols = [{ name: "bb URL", schemes: ["bb"] }];
+  }
+
   if (signingPlan.mode === "disabled") {
     mac.identity = null;
   } else if (signingPlan.identityName) {

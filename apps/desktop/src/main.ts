@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { spawnHostProcess as spawn, hostToolchain } from "@bb/process-utils";
 import { openApplicationUrl } from "./application-url.js";
 import { createDesktopLogger } from "./desktop-logger.js";
+import { createDesktopDeepLinkController } from "./desktop-deep-link-controller.js";
 import { createDesktopQuitController } from "./desktop-quit.js";
 import { attachServerUpdateControl } from "./server-update-control.js";
 import { registerServerChoiceIpc } from "./server-choice-ipc.js";
@@ -427,6 +428,25 @@ let desktopUpdateService: DesktopUpdateService | null = null;
 let desktopAutoUpdateService: DesktopAutoUpdateService | null = null;
 let currentRuntime: DesktopRuntime | null = null;
 let currentWindowUrl: string | null = null;
+const desktopDeepLinks = createDesktopDeepLinkController(
+  async (url) => {
+    const window = getFocusedApplicationWindow();
+    const currentUrl = window?.webContents.getURL();
+    if (
+      window === null ||
+      (currentUrl !== url &&
+        currentUrl?.split("#", 1)[0] === url.split("#", 1)[0])
+    ) {
+      await createApplicationWindow({ initialUrl: url, stateKey: null });
+      return;
+    }
+    if (window.isMinimized()) window.restore();
+    window.show();
+    window.focus();
+    if (currentUrl !== url) await window.loadURL(url);
+  },
+  () => desktopLogger.warn("[desktop] Could not open a bb link."),
+);
 let logViewerLineBuffer: LogLineBuffer | null = null;
 let logViewerPreloadPath: string | null = null;
 let logViewerTailer: LogTailer | null = null;
@@ -1989,6 +2009,7 @@ async function loadRemoteServerTarget(
   }
   bbAppLoaded = true;
   startRemoteSystemConfigSync(serverUrl);
+  desktopDeepLinks.setServerUrl(serverUrl);
   return true;
 }
 
@@ -2227,6 +2248,7 @@ async function openDataDirectory(): Promise<void> {
 
 async function loadWindowUrl(args: LoadWindowUrlArgs): Promise<void> {
   startupErrorPage = null;
+  desktopDeepLinks.setServerUrl(null);
   currentWindowUrl = args.url;
   if (desktopWindowFactory === null) {
     return;
@@ -2298,6 +2320,7 @@ async function loadActionView(args: LoadStartupErrorArgs): Promise<void> {
 async function loadBbApp(serverUrl: string): Promise<void> {
   bbAppLoaded = true;
   await loadWindowUrl({ url: serverUrl });
+  if (currentWindowUrl === serverUrl) desktopDeepLinks.setServerUrl(serverUrl);
   if (shouldOpenDevTools()) {
     desktopWindowFactory?.openDevTools();
   }
@@ -3037,6 +3060,12 @@ async function runDesktopApp(): Promise<void> {
     return;
   }
 
+  if (process.platform === "darwin") {
+    app.on("open-url", (event, url) => {
+      event.preventDefault();
+      desktopDeepLinks.receive(url);
+    });
+  }
   app.on("second-instance", () => {
     if (desktopWindowFactory?.focusFirstWindow() === true) {
       return;

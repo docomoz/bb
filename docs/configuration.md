@@ -1784,6 +1784,14 @@ backup before rolling back to a build predating the tolerant-reader fix #5286.
 
 ## App links
 
+The stable macOS desktop build accepts incoming `bb://` links to thread,
+project, and plugin pages on its selected server. For example,
+`bb://threads/thr_abc123`, `bb://projects/proj_abc123`, and
+`bb://plugins/thread-relay/join#invite=…` open those pages. The `thread` and
+`project` singular aliases also work. A link received during app startup waits
+for the server to finish loading. Fragments stay in the destination URL and
+query parameters are rejected.
+
 Explicit Markdown links such as `[Review note](reflect://note/Project%20X)`
 and links plugins open through `navigate.openUrl` open in their apps, for
 example `linear://` and `slack://`. Bare custom-scheme text is not auto-linked.

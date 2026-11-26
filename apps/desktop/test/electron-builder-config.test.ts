@@ -583,6 +583,14 @@ describe("electron-builder signing config", () => {
     );
   });
 
+  it("registers the bb URL scheme in stable macOS builds", async () => {
+    const { config } = await readResolvedConfig({
+      BB_DESKTOP_RELEASE_CHANNEL: "latest",
+    });
+
+    expect(config.mac.protocols).toEqual([{ name: "bb URL", schemes: ["bb"] }]);
+  });
+
   it("creates a separate nightly app identity and update feed", async () => {
     const { config } = await readResolvedConfig({
       BB_DESKTOP_RELEASE_CHANNEL: "nightly",
@@ -595,6 +603,7 @@ describe("electron-builder signing config", () => {
     expect(config.linux.icon).toBe("assets/icon-nightly.png");
     expect(config.linux.executableName).toBe("bb-nightly");
     expect(config.mac.icon).toBe("assets/icon-nightly.icns");
+    expect(config.mac.protocols).toBeUndefined();
     await expect(
       access(resolve(desktopPackageRoot, config.mac.icon)),
     ).resolves.toBeUndefined();
